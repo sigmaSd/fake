@@ -5,8 +5,8 @@ fn main() -> Result<()> {
     let n = args.next().ok_or("no file name specified")?;
     let s = args.next().ok_or("no file size specified")?;
     let s = parse(s)?;
-    let mut f = std::io::BufWriter::with_capacity(s, std::fs::File::create(n)?);
-    write(&mut f, s)?;
+    let f = std::io::BufWriter::with_capacity(s, std::fs::File::create(n)?);
+    write(f, s)?;
     Ok(())
 }
 
