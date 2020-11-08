@@ -1,54 +1,60 @@
-fn main() {
+type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+
+fn main() -> Result<()> {
     let mut args = std::env::args().skip(1);
-    let n = args.next().unwrap();
-    let s = args.next().unwrap();
-    let s = parse(s);
-    let mut f = std::io::BufWriter::with_capacity(s, std::fs::File::create(n).unwrap());
-    write(&mut f, s);
+    let n = args.next().ok_or("no file name specified")?;
+    let s = args.next().ok_or("no file size specified")?;
+    let s = parse(s)?;
+    let mut f = std::io::BufWriter::with_capacity(s, std::fs::File::create(n)?);
+    write(&mut f, s)?;
+    Ok(())
 }
 
-fn write(mut f: impl std::io::Write, s: usize) {
+fn write(mut f: impl std::io::Write, s: usize) -> Result<()> {
     let b = if let Some(idx) = std::env::args().position(|a| a == "-b") {
-        std::env::args().nth(idx + 1)
+        Some(parse(
+            std::env::args()
+                .nth(idx + 1)
+                .ok_or("no buffer size specified")?,
+        )?)
     } else {
         None
     };
 
-    let b = b.map(parse);
-
-    if std::env::args().any(|s| s == "--rand") {
+    if !std::env::args().any(|s| s == "--zero") {
         use rand::Rng;
         let mut rng = rand::thread_rng();
 
         for i in 0..s {
             if let Some(b) = b {
                 if i != 0 && i % b == 0 {
-                    f.flush().unwrap();
+                    f.flush()?;
                 }
             }
 
-            f.write_all(&[rng.gen::<u8>()]).unwrap();
+            f.write_all(&[rng.gen::<u8>()])?;
         }
-        f.flush().unwrap();
+        f.flush()?;
     } else {
         for i in 0..s {
             if let Some(b) = b {
                 if i != 0 && i % b == 0 {
-                    f.flush().unwrap();
+                    f.flush()?;
                 }
-                f.write_all(&[0]).unwrap();
             }
+            f.write_all(&[0])?;
         }
 
-        f.flush().unwrap();
+        f.flush()?;
     }
+    Ok(())
 }
-fn parse(s: String) -> usize {
+fn parse(s: String) -> Result<usize> {
     if s.ends_with("MB") {
-        s[..s.len() - 2].parse::<usize>().unwrap() * 10_usize.pow(6)
+        Ok(s[..s.len() - 2].parse::<usize>()? * 10_usize.pow(6))
     } else if s.ends_with("GB") {
-        s[..s.len() - 2].parse::<usize>().unwrap() * 10_usize.pow(9)
+        Ok(s[..s.len() - 2].parse::<usize>()? * 10_usize.pow(9))
     } else {
-        unreachable!()
+        Err("you can only specify MB/GB as size unit".into())
     }
 }
